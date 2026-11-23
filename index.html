@@ -3,69 +3,103 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Get Involved — Data Liberation Project</title>
-  <meta name="description" content="Tell the Data Liberation Project, a MuckRock Foundation project, how you'd like to help free government data.">
+  <title>Let's Build the Future of DLP Together! | Data Liberation Project</title>
+  <meta name="description" content="DLP is all about its community. Share your feedback, ideas, and thoughts through our survey.">
+  <meta name="theme-color" content="#0b1f4d">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to form</a>
+  <div class="bg" aria-hidden="true">
+    <span class="blob blob-1"></span>
+    <span class="blob blob-2"></span>
+    <span class="blob blob-3"></span>
+    <span class="grid"></span>
+  </div>
 
-  <header class="site-header">
-    <div class="container header-inner">
-      <div>
-        <p class="site-title">Data Liberation Project</p>
-        <p class="site-subtitle">A MuckRock Foundation project</p>
-      </div>
-    </div>
+  <div class="progress" id="progress" role="progressbar" aria-label="Survey progress" aria-valuemin="0" aria-valuemax="7" aria-valuenow="0" hidden>
+    <span class="progress-fill" id="progress-fill"></span>
+  </div>
+
+  <header class="topbar">
+    <p class="brand">Data Liberation Project</p>
+    <p class="brand-sub">A MuckRock Foundation project</p>
   </header>
 
-  <main id="main" class="container">
-    <section class="card" id="form-view" aria-labelledby="form-heading">
-      <h1 id="form-heading">Help us liberate government data</h1>
-      <p class="intro">
-        The Data Liberation Project uses FOIA to get important government datasets
-        and publishes them for anyone to use. Tell us a little about yourself and how
-        you'd like to be involved. It takes about two minutes.
+  <main id="main">
+    <noscript>
+      <p class="noscript">
+        This survey needs JavaScript. You can
+        <a href="https://docs.google.com/forms/d/e/1FAIpQLSctEjG5cFtYR0NGwohlyUQcscaagunSVes6E_1ieL_YF19T3Q/viewform">fill it out on Google Forms</a>
+        instead.
       </p>
-      <p class="required-note"><span class="req" aria-hidden="true">*</span> Required</p>
+    </noscript>
 
-      <div id="error-summary" class="alert alert-error" role="alert" tabindex="-1" hidden></div>
-
-      <noscript>
-        <p class="alert alert-error">
-          This form needs JavaScript. You can
-          <a href="https://docs.google.com/forms/d/e/1FAIpQLSctEjG5cFtYR0NGwohlyUQcscaagunSVes6E_1ieL_YF19T3Q/viewform">fill it out on Google Forms</a>
-          instead.
-        </p>
-      </noscript>
-
-      <form id="dlp-form" novalidate>
-        <div id="questions"></div>
-
-        <div class="form-footer">
-          <button type="submit" class="btn btn-primary" id="submit-btn">
-            <span class="btn-label">Submit</span>
-          </button>
-          <p class="privacy-note">Your answers are sent to the Data Liberation Project's Google Form.</p>
+    <form id="dlp-form" novalidate>
+      <!-- Welcome screen -->
+      <section class="step step-welcome is-active" data-step="0" aria-labelledby="welcome-heading">
+        <div class="step-inner">
+          <p class="eyebrow"><span class="pulse" aria-hidden="true"></span> Community Survey</p>
+          <h1 id="welcome-heading" tabindex="-1">Let's Build the Future of DLP <span class="highlight">Together!</span></h1>
+          <p class="lead">DLP is all about its community, and we want <strong>YOU</strong> to be part of what comes next.</p>
+          <p class="lead">Share your feedback, ideas, and thoughts through our survey. Every response counts!</p>
+          <p class="gift-teaser">
+            <span class="gift-icon" aria-hidden="true">🎁</span>
+            <span>And yes... there's a little something for you at the end!</span>
+          </p>
+          <div class="actions">
+            <button type="button" class="btn btn-start" data-action="next">
+              Let's go
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </button>
+            <span class="enter-hint" aria-hidden="true">press <kbd>Enter ↵</kbd></span>
+          </div>
+          <p class="time-note">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            Takes about 2 minutes · 7 questions
+          </p>
         </div>
-      </form>
-    </section>
+      </section>
 
-    <section class="card success" id="success-view" aria-labelledby="success-heading" hidden>
-      <div class="success-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="32" height="32"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+      <!-- Question screens are built from CONFIG in script.js -->
+      <div id="questions"></div>
+    </form>
+
+    <!-- Thank-you screen -->
+    <section class="step step-success" id="success-view" aria-labelledby="success-heading" hidden>
+      <div class="step-inner">
+        <div class="gift-burst" aria-hidden="true">
+          <span class="ring ring-1"></span>
+          <span class="ring ring-2"></span>
+          <span class="gift-big">🎉</span>
+        </div>
+        <h2 id="success-heading" tabindex="-1">Thank you!</h2>
+        <p class="lead">Your response has been recorded. You're helping shape what DLP does next.</p>
+
+        <div class="reward-card" id="reward-card" hidden>
+          <p class="reward-label">Your little something 🎁</p>
+          <p class="reward-title" id="reward-title"></p>
+          <p class="reward-text" id="reward-text"></p>
+          <a class="btn btn-start" id="reward-link" target="_blank" rel="noopener" hidden></a>
+        </div>
+
+        <button type="button" class="btn btn-ghost" id="again-btn">Submit another response</button>
       </div>
-      <h1 id="success-heading" tabindex="-1">Thank you!</h1>
-      <p>Your response has been recorded. We're glad you want to help free government data, and we'll be in touch.</p>
-      <button type="button" class="btn btn-secondary" id="again-btn">Submit another response</button>
     </section>
   </main>
 
-  <footer class="site-footer">
-    <div class="container">
-      <p>© <span id="year"></span> Data Liberation Project · MuckRock Foundation</p>
-    </div>
-  </footer>
+  <nav class="stepper" id="stepper" aria-label="Question navigation" hidden>
+    <button type="button" class="stepper-btn" id="prev-btn" aria-label="Previous question">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M6 15l6-6 6 6"/></svg>
+    </button>
+    <button type="button" class="stepper-btn" id="next-btn" aria-label="Next question">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>
+    </button>
+  </nav>
+
+  <div class="sr-only" id="announcer" aria-live="polite"></div>
 
   <script src="script.js"></script>
 </body>

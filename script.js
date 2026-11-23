@@ -48,7 +48,6 @@ const CONFIG = {
       required: true,
       label: 'Are you interested in volunteering for the Data Liberation Project?',
       options: ['Yes', 'No'],
-      columns: 2,
     },
     {
       entry: '946806936',
@@ -96,26 +95,45 @@ const CONFIG = {
       max: 5,
       minLabel: 'Worst',
       maxLabel: 'Best',
+      emojis: ['😞', '🙁', '😐', '🙂', '🤩'],
     },
   ],
+
+  /* The "little something" shown on the thank-you screen.
+     Set to null to hide the card. linkText/linkUrl are optional. */
+  reward: null,
+  // Example:
+  // reward: {
+  //   title: 'Free DLP sticker pack',
+  //   text: 'Use the link below to claim it.',
+  //   linkText: 'Claim my gift',
+  //   linkUrl: 'https://example.com',
+  // },
 };
 
 const FORM_RESPONSE_URL = `https://docs.google.com/forms/d/e/${CONFIG.formId}/formResponse`;
 const FORM_VIEW_URL = `https://docs.google.com/forms/d/e/${CONFIG.formId}/viewform`;
 const OTHER_VALUE = '__other_option__';
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const TOTAL = CONFIG.questions.length;
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ==========================================================================
-   Rendering
+   Helpers
    ========================================================================== */
+const $ = (id) => document.getElementById(id);
 const els = {
-  form: document.getElementById('dlp-form'),
-  questions: document.getElementById('questions'),
-  submit: document.getElementById('submit-btn'),
-  summary: document.getElementById('error-summary'),
-  formView: document.getElementById('form-view'),
-  successView: document.getElementById('success-view'),
-  successHeading: document.getElementById('success-heading'),
-  again: document.getElementById('again-btn'),
+  form: $('dlp-form'),
+  questions: $('questions'),
+  progress: $('progress'),
+  progressFill: $('progress-fill'),
+  stepper: $('stepper'),
+  prev: $('prev-btn'),
+  next: $('next-btn'),
+  announcer: $('announcer'),
+  success: $('success-view'),
+  successHeading: $('success-heading'),
+  again: $('again-btn'),
 };
 
 function el(tag, attrs = {}, children = []) {
@@ -124,109 +142,126 @@ function el(tag, attrs = {}, children = []) {
     if (value === false || value == null) continue;
     if (key === 'class') node.className = value;
     else if (key === 'text') node.textContent = value;
+    else if (key === 'html') node.innerHTML = value; // only used with static strings below
     else node.setAttribute(key, value === true ? '' : value);
   }
-  for (const child of [].concat(children)) {
-    if (child) node.append(child);
-  }
+  for (const child of [].concat(children)) if (child) node.append(child);
   return node;
 }
 
+const ARROW_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6"/></svg>';
+const TICK_SVG = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+
+/* ==========================================================================
+   Rendering: one <fieldset> "screen" per question
+   ========================================================================== */
 function renderQuestion(q, index) {
-  const qid = `q${index + 1}`;
+  const n = index + 1;
+  const qid = `q${n}`;
   const name = `entry.${q.entry}`;
-  const errorId = `${qid}-error`;
-  const hintId = `${qid}-hint`;
+  const isLast = n === TOTAL;
 
-  const legend = el('legend', {}, [
-    el('span', { class: 'q-num', text: `${index + 1}.` }),
-    el('span', {}, [
-      document.createTextNode(q.label),
-      q.required ? el('span', { class: 'req', 'aria-hidden': 'true', text: ' *' }) : null,
-      q.required ? el('span', { class: 'sr-only', text: ' (required)' }) : null,
+  // Screen wrapper > inner > <fieldset> whose first child is its <legend>
+  const screen = el('div', { class: 'step question', id: qid, 'data-step': n, 'data-index': index });
+  const inner = el('div', { class: 'step-inner' });
+  const box = el('fieldset', { class: 'q-fieldset', 'aria-describedby': `${qid}-hint ${qid}-error` });
+
+  box.append(
+    el('legend', { class: 'q-head' }, [
+      el('span', { class: 'q-num', html: `${n}${ARROW_SVG}` }),
+      el('span', { class: 'q-title', id: `${qid}-title`, tabindex: '-1' }, [
+        document.createTextNode(q.label),
+        q.required ? el('span', { class: 'req', 'aria-hidden': 'true', text: ' *' }) : null,
+        el('span', { class: 'sr-only', text: ` (question ${n} of ${TOTAL}${q.required ? ', required' : ''})` }),
+      ]),
     ]),
-  ]);
+  );
 
-  const fieldset = el('fieldset', {
-    class: 'question',
-    id: qid,
-    'data-index': index,
-  }, [legend]);
-
-  const describedBy = [];
-
-  if (q.type === 'checkbox') {
-    fieldset.append(el('p', { class: 'hint', id: hintId, text: 'Select all that apply.' }));
-    describedBy.push(hintId);
-  }
+  const hintText = q.type === 'checkbox' ? 'Choose as many as you like'
+    : q.type === 'scale' ? `${q.min} = ${q.minLabel}, ${q.max} = ${q.maxLabel}`
+    : 'Choose one';
+  box.append(el('p', { class: 'hint', id: `${qid}-hint`, text: hintText }));
 
   if (q.type === 'scale') {
     const options = el('div', { class: 'scale-options' });
-    for (let n = q.min; n <= q.max; n++) {
-      const endLabel = n === q.min ? q.minLabel : n === q.max ? q.maxLabel : '';
-      options.append(el('label', { class: 'scale-option' }, [
-        el('input', { type: 'radio', name, value: String(n), id: `${qid}-${n}` }),
-        el('span', {}, [
-          document.createTextNode(String(n)),
+    for (let v = q.min; v <= q.max; v++) {
+      const endLabel = v === q.min ? q.minLabel : v === q.max ? q.maxLabel : '';
+      options.append(el('label', { class: 'scale-option', 'data-key': String(v) }, [
+        el('input', { type: 'radio', name, value: String(v) }),
+        el('span', { class: 'scale-face' }, [
+          el('span', { class: 'emoji', 'aria-hidden': 'true', text: (q.emojis || [])[v - q.min] || '' }),
+          el('span', { class: 'num', text: String(v) }),
           endLabel ? el('span', { class: 'sr-only', text: ` (${endLabel})` }) : null,
         ]),
       ]));
     }
-    fieldset.append(el('div', { class: 'scale' }, [
+    box.append(el('div', { class: 'scale' }, [
       options,
       el('div', { class: 'scale-labels', 'aria-hidden': 'true' }, [
-        el('span', { text: `${q.min} = ${q.minLabel}` }),
-        el('span', { text: `${q.max} = ${q.maxLabel}` }),
+        el('span', { text: q.minLabel }),
+        el('span', { text: q.maxLabel }),
       ]),
     ]));
   } else {
+    const items = q.options.map((text) => ({ text, value: text }));
+    if (q.other) items.push({ text: 'Other', value: OTHER_VALUE, other: true });
+
     const options = el('div', { class: `options${q.columns === 2 ? ' two-col' : ''}` });
-    q.options.forEach((text, i) => {
-      options.append(el('label', { class: 'option' }, [
-        el('input', { type: q.type, name, value: text, id: `${qid}-${i}` }),
-        el('span', { class: 'option-text', text }),
+    items.forEach((item, i) => {
+      options.append(el('label', { class: 'option', 'data-key': LETTERS[i] }, [
+        el('input', {
+          type: q.type, name, value: item.value,
+          'data-other': item.other ? 'true' : null,
+          'aria-controls': item.other ? `${qid}-other-wrap` : null,
+        }),
+        el('span', { class: 'key', 'aria-hidden': 'true', text: LETTERS[i] }),
+        el('span', { class: 'option-text', text: item.text }),
+        el('span', { class: 'tick', html: TICK_SVG }),
       ]));
     });
+    box.append(options);
 
     if (q.other) {
-      const otherId = `${qid}-other`;
-      const otherTextId = `${qid}-other-text`;
-      options.append(el('label', { class: 'option' }, [
+      box.append(el('div', { class: 'other-wrap', id: `${qid}-other-wrap`, hidden: true }, [
+        el('label', { for: `${qid}-other-text`, text: 'Tell us more' }),
         el('input', {
-          type: q.type, name, value: OTHER_VALUE, id: otherId,
-          'aria-controls': `${otherTextId}-wrap`, 'data-other': 'true',
-        }),
-        el('span', { class: 'option-text', text: 'Other' }),
-      ]));
-      fieldset.append(options);
-      fieldset.append(el('div', { class: 'other-wrap', id: `${otherTextId}-wrap`, hidden: true }, [
-        el('label', { for: otherTextId, text: 'Please specify' }),
-        el('input', {
-          type: 'text', class: 'text-input', id: otherTextId,
-          name: `${name}.other_option_response`, autocomplete: 'off',
-          disabled: true, // disabled inputs are skipped by FormData
+          type: 'text', class: 'text-input', id: `${qid}-other-text`,
+          name: `${name}.other_option_response`,
+          placeholder: 'Type your answer here…', autocomplete: 'off',
+          disabled: true, // disabled inputs are left out of the submission
         }),
       ]));
-    } else {
-      fieldset.append(options);
     }
   }
 
-  fieldset.append(el('p', { class: 'field-error', id: errorId, hidden: true }));
-  if (describedBy.length) fieldset.setAttribute('aria-describedby', describedBy.join(' '));
-  return fieldset;
+  box.append(el('p', { class: 'field-error', id: `${qid}-error`, role: 'alert' }));
+
+  const actions = el('div', { class: 'actions' }, [
+    isLast
+      ? el('button', { type: 'submit', class: 'btn btn-ok', id: 'submit-btn' }, [el('span', { class: 'btn-label', text: 'Submit' })])
+      : el('button', { type: 'button', class: 'btn btn-ok', 'data-action': 'ok', html: `OK ${TICK_SVG}` }),
+    el('span', { class: 'enter-hint', 'aria-hidden': 'true', html: 'press <kbd>Enter ↵</kbd>' }),
+  ]);
+  box.append(actions);
+
+  inner.append(box);
+  screen.append(inner);
+  return screen;
 }
 
 CONFIG.questions.forEach((q, i) => els.questions.append(renderQuestion(q, i)));
-document.getElementById('year').textContent = new Date().getFullYear();
+const steps = [...els.form.querySelectorAll('.step')]; // [welcome, q1..q7]
+const submitBtn = $('submit-btn');
 
 /* ==========================================================================
-   "Other" text box: show + enable only while Other is selected
+   Answer state + validation (mirrors the Google Form's required questions)
    ========================================================================== */
-function syncOther(fieldset) {
-  const otherInput = fieldset.querySelector('input[data-other]');
-  if (!otherInput) return;
-  const wrap = fieldset.querySelector('.other-wrap');
+const questionOf = (fs) => CONFIG.questions[Number(fs.dataset.index)];
+
+function syncOther(fs) {
+  const otherInput = fs.querySelector('input[data-other]');
+  if (!otherInput) return null;
+  const wrap = fs.querySelector('.other-wrap');
   const text = wrap.querySelector('input');
   const on = otherInput.checked;
   wrap.hidden = !on;
@@ -236,109 +271,176 @@ function syncOther(fieldset) {
   return { on, text };
 }
 
-/* ==========================================================================
-   Validation (mirrors the Google Form's required questions)
-   ========================================================================== */
-let attemptedSubmit = false;
-
-function validateQuestion(fieldset) {
-  const q = CONFIG.questions[Number(fieldset.dataset.index)];
-  const checked = fieldset.querySelectorAll('input[type=checkbox]:checked, input[type=radio]:checked');
-  const otherText = fieldset.querySelector('.other-wrap input');
-  const otherOn = !!fieldset.querySelector('input[data-other]:checked');
-  let message = '';
-  let focusTarget = fieldset.querySelector('input');
-
+function problemWith(fs) {
+  const q = questionOf(fs);
+  const checked = fs.querySelectorAll('input:checked');
+  const otherOn = !!fs.querySelector('input[data-other]:checked');
+  const otherText = fs.querySelector('.other-wrap input');
   if (q.required && checked.length === 0) {
-    message = q.type === 'checkbox' ? 'Please select at least one option.'
-      : q.type === 'scale' ? `Please choose a rating from ${q.min} to ${q.max}.`
-      : 'Please choose an option.';
-  } else if (otherOn && !otherText.value.trim()) {
-    message = 'Please describe your “Other” answer.';
-    focusTarget = otherText;
+    return {
+      message: q.type === 'checkbox' ? 'Please select at least one option'
+        : q.type === 'scale' ? `Please pick a number from ${q.min} to ${q.max}`
+        : 'Please choose an option',
+      focus: fs.querySelector('input'),
+    };
   }
-
-  setError(fieldset, message);
-  if (otherText) otherText.setAttribute('aria-invalid', String(otherOn && !otherText.value.trim() && !!message));
-  return message ? { fieldset, message, focusTarget, label: q.label } : null;
+  if (otherOn && !otherText.value.trim()) {
+    return { message: 'Please type your “Other” answer', focus: otherText };
+  }
+  return null;
 }
 
-function setError(fieldset, message) {
-  const errorEl = fieldset.querySelector('.field-error');
-  const hint = fieldset.querySelector('.hint');
-  const ids = [hint && hint.id, message && errorEl.id].filter(Boolean);
-  errorEl.textContent = message;
-  errorEl.hidden = !message;
-  fieldset.classList.toggle('has-error', !!message);
-  if (ids.length) fieldset.setAttribute('aria-describedby', ids.join(' '));
-  else fieldset.removeAttribute('aria-describedby');
+function showError(fs, problem) {
+  const errorEl = fs.querySelector('.field-error');
+  errorEl.textContent = '';
+  if (problem) {
+    // re-trigger the shake animation
+    void errorEl.offsetWidth;
+    errorEl.textContent = problem.message;
+  }
+  const otherText = fs.querySelector('.other-wrap input');
+  if (otherText) otherText.setAttribute('aria-invalid', String(!!problem && problem.focus === otherText));
 }
 
-function showSummary(errors) {
-  const s = els.summary;
-  s.replaceChildren();
-  if (!errors.length) { s.hidden = true; return; }
-  const list = el('ul');
-  errors.forEach((err) => {
-    const link = el('a', { href: `#${err.fieldset.id}`, text: `${err.label}: ${err.message}` });
-    link.addEventListener('click', (e) => {
-      e.preventDefault();
-      err.fieldset.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      err.focusTarget.focus({ preventScroll: true });
-    });
-    list.append(el('li', {}, [link]));
-  });
-  s.append(
-    el('p', { text: errors.length === 1 ? 'Please fix 1 problem before submitting:' : `Please fix ${errors.length} problems before submitting:` }),
-    list,
-  );
-  s.hidden = false;
+function updateProgress() {
+  const answered = steps.slice(1).filter((fs) => !problemWith(fs)).length;
+  els.progressFill.style.width = `${(answered / TOTAL) * 100}%`;
+  els.progress.setAttribute('aria-valuenow', String(answered));
+  els.progress.setAttribute('aria-valuetext', `${answered} of ${TOTAL} answered`);
 }
 
-function showNetworkError() {
-  const s = els.summary;
-  s.replaceChildren(
-    el('p', { text: 'Sorry, we couldn’t send your response.' }),
-    el('span', {}, [
-      document.createTextNode('Please check your internet connection and try again. If it keeps failing, you can '),
-      el('a', { href: FORM_VIEW_URL, target: '_blank', rel: 'noopener', text: 'fill out the form on Google Forms' }),
-      document.createTextNode('.'),
-    ]),
-  );
-  s.hidden = false;
-  s.focus();
+/* ==========================================================================
+   Navigation
+   ========================================================================== */
+let current = 0;
+let autoAdvanceTimer = null;
+
+function goTo(index, { focus = true } = {}) {
+  clearTimeout(autoAdvanceTimer);
+  if (index < 0 || index >= steps.length || index === current) return;
+  const dir = index > current ? 'enter-forward' : 'enter-back';
+  const from = steps[current];
+  const to = steps[index];
+
+  from.classList.remove('is-active', 'enter-forward', 'enter-back');
+  to.classList.remove('enter-forward', 'enter-back');
+  to.classList.add('is-active');
+  if (!reducedMotion) to.classList.add(dir);
+  current = index;
+
+  const inQuestions = current > 0;
+  els.progress.hidden = !inQuestions;
+  els.stepper.hidden = !inQuestions;
+  els.prev.disabled = current <= 1;
+  els.next.disabled = current >= steps.length - 1;
+  updateProgress();
+  window.scrollTo({ top: 0 });
+
+  if (inQuestions) els.announcer.textContent = `Question ${current} of ${TOTAL}`;
+  if (focus) {
+    const target = inQuestions ? to.querySelector('.q-title') : to.querySelector('h1');
+    target.focus({ preventScroll: true });
+  }
+}
+
+/** "OK" on the current screen: validate, then move on (or submit on the last one). */
+function confirmStep() {
+  if (current === 0) return goTo(1);
+  const fs = steps[current];
+  const problem = problemWith(fs);
+  showError(fs, problem);
+  if (problem) { problem.focus.focus(); return; }
+  if (current === steps.length - 1) els.form.requestSubmit(submitBtn);
+  else goTo(current + 1);
+}
+
+function queueAutoAdvance() {
+  clearTimeout(autoAdvanceTimer);
+  if (current === steps.length - 1) return; // never auto-submit
+  const from = current;
+  autoAdvanceTimer = setTimeout(() => { if (current === from) confirmStep(); }, 450);
 }
 
 /* ==========================================================================
    Events
    ========================================================================== */
+// Pointer clicks on single-choice options auto-advance (like Typeform).
+// Arrow-key changes inside a radio group don't, so keyboard users can browse.
+let lastPointer = 0;
+els.form.addEventListener('pointerdown', (e) => {
+  if (e.target.closest('.option, .scale-option')) lastPointer = Date.now();
+});
+
 els.form.addEventListener('change', (e) => {
-  const fieldset = e.target.closest('.question');
-  if (!fieldset) return;
-  if (e.target.matches('input[type=checkbox], input[type=radio]')) {
-    const res = syncOther(fieldset);
-    if (res && res.on && e.target.dataset.other && e.target.checked) res.text.focus();
-  }
-  if (attemptedSubmit) validateQuestion(fieldset);
+  const fs = e.target.closest('.question');
+  if (!fs || !e.target.matches('input[type=checkbox], input[type=radio]')) return;
+  const other = syncOther(fs);
+  if (other && other.on && e.target.dataset.other && e.target.checked) other.text.focus();
+  if (fs.querySelector('.field-error').textContent) showError(fs, problemWith(fs));
+  updateProgress();
+
+  const isSingle = e.target.type === 'radio';
+  const fromPointer = Date.now() - lastPointer < 800;
+  if (isSingle && fromPointer && !e.target.dataset.other) queueAutoAdvance();
 });
 
 els.form.addEventListener('input', (e) => {
-  if (!attemptedSubmit || !e.target.matches('.text-input')) return;
-  validateQuestion(e.target.closest('.question'));
+  if (!e.target.matches('.text-input')) return;
+  const fs = e.target.closest('.question');
+  if (fs.querySelector('.field-error').textContent) showError(fs, problemWith(fs));
+  updateProgress();
 });
 
+els.form.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  if (btn.dataset.action === 'next' || btn.dataset.action === 'ok') confirmStep();
+});
+
+els.prev.addEventListener('click', () => goTo(current - 1));
+els.next.addEventListener('click', confirmStep);
+
+// Keyboard shortcuts: Enter = OK, letters pick options, 1–5 pick a rating.
+document.addEventListener('keydown', (e) => {
+  if (!els.success.hidden || e.metaKey || e.ctrlKey || e.altKey) return;
+  const t = e.target;
+  const inText = t.matches && t.matches('input[type=text], textarea');
+
+  if (e.key === 'Enter' && !e.shiftKey) {
+    if (t.closest && t.closest('button, a')) return; // let buttons/links act normally
+    e.preventDefault();
+    if (!submitBtn.disabled) confirmStep();
+    return;
+  }
+  if (inText || current === 0 || e.key.length !== 1) return;
+
+  const fs = steps[current];
+  const opt = fs.querySelector(`[data-key="${CSS.escape(e.key.toUpperCase())}"]`);
+  if (!opt) return;
+  e.preventDefault();
+  const input = opt.querySelector('input');
+  input.focus({ preventScroll: true }); // before change, so "Other" can move focus to its text box
+  input.checked = input.type === 'checkbox' ? !input.checked : true;
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+  if (!reducedMotion) { opt.classList.remove('flash'); void opt.offsetWidth; opt.classList.add('flash'); }
+  if (input.type === 'radio' && !input.dataset.other) queueAutoAdvance();
+});
+
+/* ==========================================================================
+   Submit
+   ========================================================================== */
 function setSending(sending) {
-  els.submit.disabled = sending;
+  submitBtn.disabled = sending;
   els.form.setAttribute('aria-busy', String(sending));
-  els.submit.replaceChildren(
+  submitBtn.replaceChildren(
     ...(sending ? [el('span', { class: 'spinner', 'aria-hidden': 'true' })] : []),
     el('span', { class: 'btn-label', text: sending ? 'Sending…' : 'Submit' }),
   );
 }
 
 function buildPayload() {
-  // Disabled "Other" text boxes are skipped automatically. Checkbox questions
-  // produce one entry.ID pair per selected option, which is what Google expects.
+  // Checkbox questions produce one entry.ID pair per selected option.
+  // Disabled "Other" text boxes are skipped automatically by FormData.
   const params = new URLSearchParams();
   for (const [key, value] of new FormData(els.form)) {
     params.append(key, key.endsWith('.other_option_response') ? value.trim() : value);
@@ -350,48 +452,124 @@ function buildPayload() {
 
 els.form.addEventListener('submit', async (e) => {
   e.preventDefault();
-  if (els.submit.disabled) return;
-  attemptedSubmit = true;
+  if (submitBtn.disabled) return;
 
-  const errors = [...els.form.querySelectorAll('.question')]
-    .map(validateQuestion)
-    .filter(Boolean);
-
-  if (errors.length) {
-    showSummary(errors);
-    els.summary.focus();
+  // Final safety net: every required answer must be present, or Google silently drops the response.
+  const firstBad = steps.slice(1).find((fs) => problemWith(fs));
+  if (firstBad) {
+    goTo(steps.indexOf(firstBad));
+    const problem = problemWith(firstBad);
+    showError(firstBad, problem);
+    problem.focus.focus();
     return;
   }
 
-  showSummary([]);
+  const lastFs = steps[steps.length - 1];
   setSending(true);
   try {
     // no-cors: the response is opaque, so a resolved fetch is treated as success.
-    // That's why the client-side validation above must mirror Google's rules.
-    await fetch(FORM_RESPONSE_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      body: buildPayload(), // sent as application/x-www-form-urlencoded
-    });
-    els.formView.hidden = true;
-    els.successView.hidden = false;
-    window.scrollTo({ top: 0 });
-    els.successHeading.focus();
+    await fetch(FORM_RESPONSE_URL, { method: 'POST', mode: 'no-cors', body: buildPayload() });
+    showSuccess();
   } catch (err) {
     console.error('Submission failed:', err);
-    showNetworkError();
+    const errorEl = lastFs.querySelector('.field-error');
+    errorEl.textContent = '';
+    errorEl.append(
+      'Couldn’t send. Check your connection and try again, or ',
+      el('a', { href: FORM_VIEW_URL, target: '_blank', rel: 'noopener', text: 'use Google Forms' }),
+      '.',
+    );
   } finally {
     setSending(false);
   }
 });
 
+/* ==========================================================================
+   Thank-you screen + confetti
+   ========================================================================== */
+function showSuccess() {
+  steps[current].classList.remove('is-active');
+  els.form.hidden = true;
+  els.stepper.hidden = true;
+  els.progressFill.style.width = '100%';
+
+  const r = CONFIG.reward;
+  $('reward-card').hidden = !r;
+  if (r) {
+    $('reward-title').textContent = r.title || '';
+    $('reward-text').textContent = r.text || '';
+    const link = $('reward-link');
+    link.hidden = !(r.linkUrl && r.linkText);
+    if (!link.hidden) { link.href = r.linkUrl; link.textContent = r.linkText; }
+  }
+
+  els.success.hidden = false;
+  els.success.classList.add('is-active');
+  window.scrollTo({ top: 0 });
+  els.successHeading.focus({ preventScroll: true });
+  launchConfetti();
+}
+
+function launchConfetti() {
+  if (reducedMotion) return;
+  const canvas = el('canvas', { class: 'confetti', 'aria-hidden': 'true' });
+  document.body.append(canvas);
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const resize = () => {
+    canvas.width = innerWidth * dpr;
+    canvas.height = innerHeight * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  };
+  resize();
+  addEventListener('resize', resize);
+
+  const colors = ['#ffffff', '#9cc2ff', '#3b7bff', '#dbe7ff', '#ffd166'];
+  const pieces = Array.from({ length: 180 }, (_, i) => {
+    const fromLeft = i % 2 === 0;
+    return {
+      x: fromLeft ? -10 : innerWidth + 10,
+      y: innerHeight * (0.55 + Math.random() * 0.35),
+      vx: (fromLeft ? 1 : -1) * (6 + Math.random() * 9),
+      vy: -(10 + Math.random() * 12),
+      w: 6 + Math.random() * 6,
+      h: 8 + Math.random() * 10,
+      rot: Math.random() * Math.PI,
+      vr: (Math.random() - 0.5) * 0.35,
+      color: colors[i % colors.length],
+    };
+  });
+
+  const start = performance.now();
+  (function frame(now) {
+    const t = now - start;
+    ctx.clearRect(0, 0, innerWidth, innerHeight);
+    for (const p of pieces) {
+      p.vy += 0.38; p.vx *= 0.985; p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1 - Math.max(0, t - 2600) / 900);
+      ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h * Math.abs(Math.cos(p.rot * 2)) + 2);
+      ctx.restore();
+    }
+    if (t < 3500) requestAnimationFrame(frame);
+    else { removeEventListener('resize', resize); canvas.remove(); }
+  })(start);
+}
+
 els.again.addEventListener('click', () => {
   els.form.reset();
-  attemptedSubmit = false;
-  els.form.querySelectorAll('.question').forEach((fs) => { syncOther(fs); setError(fs, ''); });
-  showSummary([]);
-  els.successView.hidden = true;
-  els.formView.hidden = false;
+  steps.slice(1).forEach((fs) => { syncOther(fs); showError(fs, null); });
+  els.success.hidden = true;
+  els.success.classList.remove('is-active');
+  els.form.hidden = false;
+  steps.forEach((s) => s.classList.remove('is-active', 'enter-forward', 'enter-back'));
+  steps[0].classList.add('is-active');
+  current = 0;
+  els.progress.hidden = true;
+  els.stepper.hidden = true;
+  updateProgress();
   window.scrollTo({ top: 0 });
-  els.form.querySelector('input').focus();
+  steps[0].querySelector('h1').focus({ preventScroll: true });
 });

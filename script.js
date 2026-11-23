@@ -48,6 +48,7 @@ const CONFIG = {
       required: true,
       label: 'Are you interested in volunteering for the Data Liberation Project?',
       options: ['Yes', 'No'],
+      columns: 2,
     },
     {
       entry: '946806936',
@@ -124,13 +125,13 @@ const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matc
 const $ = (id) => document.getElementById(id);
 const els = {
   form: $('dlp-form'),
+  formView: $('form-view'),
   questions: $('questions'),
+  summary: $('error-summary'),
+  submit: $('submit-btn'),
   progress: $('progress'),
   progressFill: $('progress-fill'),
-  stepper: $('stepper'),
-  prev: $('prev-btn'),
-  next: $('next-btn'),
-  announcer: $('announcer'),
+  start: $('start-btn'),
   success: $('success-view'),
   successHeading: $('success-heading'),
   again: $('again-btn'),
@@ -142,45 +143,45 @@ function el(tag, attrs = {}, children = []) {
     if (value === false || value == null) continue;
     if (key === 'class') node.className = value;
     else if (key === 'text') node.textContent = value;
-    else if (key === 'html') node.innerHTML = value; // only used with static strings below
+    else if (key === 'html') node.innerHTML = value; // static strings only
     else node.setAttribute(key, value === true ? '' : value);
   }
   for (const child of [].concat(children)) if (child) node.append(child);
   return node;
 }
 
-const ARROW_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6"/></svg>';
 const TICK_SVG = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
 /* ==========================================================================
-   Rendering: one <fieldset> "screen" per question
+   Rendering: every question on one page
    ========================================================================== */
 function renderQuestion(q, index) {
   const n = index + 1;
   const qid = `q${n}`;
   const name = `entry.${q.entry}`;
-  const isLast = n === TOTAL;
 
-  // Screen wrapper > inner > <fieldset> whose first child is its <legend>
-  const screen = el('div', { class: 'step question', id: qid, 'data-step': n, 'data-index': index });
-  const inner = el('div', { class: 'step-inner' });
-  const box = el('fieldset', { class: 'q-fieldset', 'aria-describedby': `${qid}-hint ${qid}-error` });
+  const fs = el('fieldset', {
+    class: 'question', id: qid, 'data-index': index,
+    'aria-describedby': `${qid}-hint`,
+  });
 
-  box.append(
-    el('legend', { class: 'q-head' }, [
-      el('span', { class: 'q-num', html: `${n}${ARROW_SVG}` }),
-      el('span', { class: 'q-title', id: `${qid}-title`, tabindex: '-1' }, [
-        document.createTextNode(q.label),
-        q.required ? el('span', { class: 'req', 'aria-hidden': 'true', text: ' *' }) : null,
-        el('span', { class: 'sr-only', text: ` (question ${n} of ${TOTAL}${q.required ? ', required' : ''})` }),
-      ]),
+  fs.append(el('legend', { class: 'q-head' }, [
+    el('span', { class: 'q-num', 'aria-hidden': 'true' }, [
+      el('span', { class: 'n', text: String(n) }),
+      el('span', { class: 'check', html: TICK_SVG }),
     ]),
-  );
+    el('span', { class: 'q-title' }, [
+      el('span', { class: 'sr-only', text: `Question ${n}: ` }),
+      document.createTextNode(q.label),
+      q.required ? el('span', { class: 'req', 'aria-hidden': 'true', text: ' *' }) : null,
+      q.required ? el('span', { class: 'sr-only', text: ' (required)' }) : null,
+    ]),
+  ]));
 
   const hintText = q.type === 'checkbox' ? 'Choose as many as you like'
     : q.type === 'scale' ? `${q.min} = ${q.minLabel}, ${q.max} = ${q.maxLabel}`
     : 'Choose one';
-  box.append(el('p', { class: 'hint', id: `${qid}-hint`, text: hintText }));
+  fs.append(el('p', { class: 'hint', id: `${qid}-hint`, text: hintText }));
 
   if (q.type === 'scale') {
     const options = el('div', { class: 'scale-options' });
@@ -195,7 +196,7 @@ function renderQuestion(q, index) {
         ]),
       ]));
     }
-    box.append(el('div', { class: 'scale' }, [
+    fs.append(el('div', { class: 'scale' }, [
       options,
       el('div', { class: 'scale-labels', 'aria-hidden': 'true' }, [
         el('span', { text: q.minLabel }),
@@ -219,10 +220,10 @@ function renderQuestion(q, index) {
         el('span', { class: 'tick', html: TICK_SVG }),
       ]));
     });
-    box.append(options);
+    fs.append(options);
 
     if (q.other) {
-      box.append(el('div', { class: 'other-wrap', id: `${qid}-other-wrap`, hidden: true }, [
+      fs.append(el('div', { class: 'other-wrap', id: `${qid}-other-wrap`, hidden: true }, [
         el('label', { for: `${qid}-other-text`, text: 'Tell us more' }),
         el('input', {
           type: 'text', class: 'text-input', id: `${qid}-other-text`,
@@ -234,29 +235,19 @@ function renderQuestion(q, index) {
     }
   }
 
-  box.append(el('p', { class: 'field-error', id: `${qid}-error`, role: 'alert' }));
-
-  const actions = el('div', { class: 'actions' }, [
-    isLast
-      ? el('button', { type: 'submit', class: 'btn btn-ok', id: 'submit-btn' }, [el('span', { class: 'btn-label', text: 'Submit' })])
-      : el('button', { type: 'button', class: 'btn btn-ok', 'data-action': 'ok', html: `OK ${TICK_SVG}` }),
-    el('span', { class: 'enter-hint', 'aria-hidden': 'true', html: 'press <kbd>Enter ↵</kbd>' }),
-  ]);
-  box.append(actions);
-
-  inner.append(box);
-  screen.append(inner);
-  return screen;
+  fs.append(el('p', { class: 'field-error', id: `${qid}-error`, hidden: true }));
+  return fs;
 }
 
 CONFIG.questions.forEach((q, i) => els.questions.append(renderQuestion(q, i)));
-const steps = [...els.form.querySelectorAll('.step')]; // [welcome, q1..q7]
-const submitBtn = $('submit-btn');
+const fieldsets = [...els.questions.querySelectorAll('.question')];
+document.getElementById('year').textContent = new Date().getFullYear();
 
 /* ==========================================================================
    Answer state + validation (mirrors the Google Form's required questions)
    ========================================================================== */
 const questionOf = (fs) => CONFIG.questions[Number(fs.dataset.index)];
+let attemptedSubmit = false;
 
 function syncOther(fs) {
   const otherInput = fs.querySelector('input[data-other]');
@@ -292,83 +283,38 @@ function problemWith(fs) {
 
 function showError(fs, problem) {
   const errorEl = fs.querySelector('.field-error');
-  errorEl.textContent = '';
-  if (problem) {
-    // re-trigger the shake animation
-    void errorEl.offsetWidth;
-    errorEl.textContent = problem.message;
-  }
+  const hintId = `${fs.id}-hint`;
+  errorEl.hidden = !problem;
+  errorEl.textContent = problem ? problem.message : '';
+  fs.classList.toggle('has-error', !!problem);
+  fs.setAttribute('aria-describedby', problem ? `${hintId} ${errorEl.id}` : hintId);
   const otherText = fs.querySelector('.other-wrap input');
   if (otherText) otherText.setAttribute('aria-invalid', String(!!problem && problem.focus === otherText));
 }
 
-function updateProgress() {
-  const answered = steps.slice(1).filter((fs) => !problemWith(fs)).length;
+function refresh(fs) {
+  const problem = problemWith(fs);
+  fs.classList.toggle('is-answered', !problem);
+  if (attemptedSubmit) showError(fs, problem);
+  const answered = fieldsets.filter((f) => !problemWith(f)).length;
   els.progressFill.style.width = `${(answered / TOTAL) * 100}%`;
   els.progress.setAttribute('aria-valuenow', String(answered));
   els.progress.setAttribute('aria-valuetext', `${answered} of ${TOTAL} answered`);
+  if (attemptedSubmit && !fieldsets.some((f) => problemWith(f))) els.summary.hidden = true;
 }
 
-/* ==========================================================================
-   Navigation
-   ========================================================================== */
-let current = 0;
-let autoAdvanceTimer = null;
-
-function goTo(index, { focus = true } = {}) {
-  clearTimeout(autoAdvanceTimer);
-  if (index < 0 || index >= steps.length || index === current) return;
-  const dir = index > current ? 'enter-forward' : 'enter-back';
-  const from = steps[current];
-  const to = steps[index];
-
-  from.classList.remove('is-active', 'enter-forward', 'enter-back');
-  to.classList.remove('enter-forward', 'enter-back');
-  to.classList.add('is-active');
-  if (!reducedMotion) to.classList.add(dir);
-  current = index;
-
-  const inQuestions = current > 0;
-  els.progress.hidden = !inQuestions;
-  els.stepper.hidden = !inQuestions;
-  els.prev.disabled = current <= 1;
-  els.next.disabled = current >= steps.length - 1;
-  updateProgress();
-  window.scrollTo({ top: 0 });
-
-  if (inQuestions) els.announcer.textContent = `Question ${current} of ${TOTAL}`;
-  if (focus) {
-    const target = inQuestions ? to.querySelector('.q-title') : to.querySelector('h1');
-    target.focus({ preventScroll: true });
-  }
-}
-
-/** "OK" on the current screen: validate, then move on (or submit on the last one). */
-function confirmStep() {
-  if (current === 0) return goTo(1);
-  const fs = steps[current];
-  const problem = problemWith(fs);
-  showError(fs, problem);
-  if (problem) { problem.focus.focus(); return; }
-  if (current === steps.length - 1) els.form.requestSubmit(submitBtn);
-  else goTo(current + 1);
-}
-
-function queueAutoAdvance() {
-  clearTimeout(autoAdvanceTimer);
-  if (current === steps.length - 1) return; // never auto-submit
-  const from = current;
-  autoAdvanceTimer = setTimeout(() => { if (current === from) confirmStep(); }, 450);
+function focusQuestion(fs) {
+  fs.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'center' });
+  const target = fs.querySelector('input:checked') || fs.querySelector('input');
+  target.focus({ preventScroll: true });
 }
 
 /* ==========================================================================
    Events
    ========================================================================== */
-// Pointer clicks on single-choice options auto-advance (like Typeform).
-// Arrow-key changes inside a radio group don't, so keyboard users can browse.
-let lastPointer = 0;
-els.form.addEventListener('pointerdown', (e) => {
-  if (e.target.closest('.option, .scale-option')) lastPointer = Date.now();
+els.start.addEventListener('click', (e) => {
+  e.preventDefault();
+  focusQuestion(fieldsets[0]);
 });
 
 els.form.addEventListener('change', (e) => {
@@ -376,45 +322,30 @@ els.form.addEventListener('change', (e) => {
   if (!fs || !e.target.matches('input[type=checkbox], input[type=radio]')) return;
   const other = syncOther(fs);
   if (other && other.on && e.target.dataset.other && e.target.checked) other.text.focus();
-  if (fs.querySelector('.field-error').textContent) showError(fs, problemWith(fs));
-  updateProgress();
-
-  const isSingle = e.target.type === 'radio';
-  const fromPointer = Date.now() - lastPointer < 800;
-  if (isSingle && fromPointer && !e.target.dataset.other) queueAutoAdvance();
+  refresh(fs);
 });
 
 els.form.addEventListener('input', (e) => {
-  if (!e.target.matches('.text-input')) return;
+  if (e.target.matches('.text-input')) refresh(e.target.closest('.question'));
+});
+
+// Keyboard shortcuts inside a question: letters (or 1–5) pick options,
+// Enter jumps to the next question.
+els.form.addEventListener('keydown', (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
   const fs = e.target.closest('.question');
-  if (fs.querySelector('.field-error').textContent) showError(fs, problemWith(fs));
-  updateProgress();
-});
-
-els.form.addEventListener('click', (e) => {
-  const btn = e.target.closest('[data-action]');
-  if (!btn) return;
-  if (btn.dataset.action === 'next' || btn.dataset.action === 'ok') confirmStep();
-});
-
-els.prev.addEventListener('click', () => goTo(current - 1));
-els.next.addEventListener('click', confirmStep);
-
-// Keyboard shortcuts: Enter = OK, letters pick options, 1–5 pick a rating.
-document.addEventListener('keydown', (e) => {
-  if (!els.success.hidden || e.metaKey || e.ctrlKey || e.altKey) return;
-  const t = e.target;
-  const inText = t.matches && t.matches('input[type=text], textarea');
+  if (!fs) return;
+  const inText = e.target.matches('input[type=text]');
 
   if (e.key === 'Enter' && !e.shiftKey) {
-    if (t.closest && t.closest('button, a')) return; // let buttons/links act normally
-    e.preventDefault();
-    if (!submitBtn.disabled) confirmStep();
+    e.preventDefault(); // don't submit the whole form from inside a question
+    const next = fieldsets[fieldsets.indexOf(fs) + 1];
+    if (next) focusQuestion(next);
+    else els.submit.focus();
     return;
   }
-  if (inText || current === 0 || e.key.length !== 1) return;
+  if (inText || e.key.length !== 1) return;
 
-  const fs = steps[current];
   const opt = fs.querySelector(`[data-key="${CSS.escape(e.key.toUpperCase())}"]`);
   if (!opt) return;
   e.preventDefault();
@@ -423,19 +354,36 @@ document.addEventListener('keydown', (e) => {
   input.checked = input.type === 'checkbox' ? !input.checked : true;
   input.dispatchEvent(new Event('change', { bubbles: true }));
   if (!reducedMotion) { opt.classList.remove('flash'); void opt.offsetWidth; opt.classList.add('flash'); }
-  if (input.type === 'radio' && !input.dataset.other) queueAutoAdvance();
 });
 
 /* ==========================================================================
    Submit
    ========================================================================== */
 function setSending(sending) {
-  submitBtn.disabled = sending;
+  els.submit.disabled = sending;
   els.form.setAttribute('aria-busy', String(sending));
-  submitBtn.replaceChildren(
+  els.submit.replaceChildren(
     ...(sending ? [el('span', { class: 'spinner', 'aria-hidden': 'true' })] : []),
     el('span', { class: 'btn-label', text: sending ? 'Sending…' : 'Submit' }),
   );
+}
+
+function showSummary(problems) {
+  const s = els.summary;
+  s.replaceChildren();
+  if (!problems.length) { s.hidden = true; return; }
+  const list = el('ul');
+  problems.forEach(({ fs, problem }) => {
+    const n = Number(fs.dataset.index) + 1;
+    const link = el('a', { href: `#${fs.id}`, text: `Question ${n}: ${problem.message}` });
+    link.addEventListener('click', (e) => { e.preventDefault(); focusQuestion(fs); problem.focus.focus({ preventScroll: true }); });
+    list.append(el('li', {}, [link]));
+  });
+  s.append(
+    el('p', { text: problems.length === 1 ? 'Almost there! 1 question still needs an answer:' : `Almost there! ${problems.length} questions still need an answer:` }),
+    list,
+  );
+  s.hidden = false;
 }
 
 function buildPayload() {
@@ -452,19 +400,20 @@ function buildPayload() {
 
 els.form.addEventListener('submit', async (e) => {
   e.preventDefault();
-  if (submitBtn.disabled) return;
+  if (els.submit.disabled) return;
+  attemptedSubmit = true;
 
-  // Final safety net: every required answer must be present, or Google silently drops the response.
-  const firstBad = steps.slice(1).find((fs) => problemWith(fs));
-  if (firstBad) {
-    goTo(steps.indexOf(firstBad));
-    const problem = problemWith(firstBad);
-    showError(firstBad, problem);
-    problem.focus.focus();
+  // Google silently drops incomplete responses (and no-cors can't tell us), so check everything here.
+  const problems = fieldsets.map((fs) => ({ fs, problem: problemWith(fs) })).filter((p) => p.problem);
+  fieldsets.forEach((fs) => showError(fs, problemWith(fs)));
+  if (problems.length) {
+    showSummary(problems);
+    els.summary.focus({ preventScroll: true });
+    els.summary.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'center' });
     return;
   }
 
-  const lastFs = steps[steps.length - 1];
+  showSummary([]);
   setSending(true);
   try {
     // no-cors: the response is opaque, so a resolved fetch is treated as success.
@@ -472,13 +421,16 @@ els.form.addEventListener('submit', async (e) => {
     showSuccess();
   } catch (err) {
     console.error('Submission failed:', err);
-    const errorEl = lastFs.querySelector('.field-error');
-    errorEl.textContent = '';
-    errorEl.append(
-      'Couldn’t send. Check your connection and try again, or ',
-      el('a', { href: FORM_VIEW_URL, target: '_blank', rel: 'noopener', text: 'use Google Forms' }),
-      '.',
+    els.summary.replaceChildren(
+      el('p', { text: 'Sorry, we couldn’t send your response.' }),
+      el('span', {}, [
+        'Please check your internet connection and try again. If it keeps failing, you can ',
+        el('a', { href: FORM_VIEW_URL, target: '_blank', rel: 'noopener', text: 'fill out the form on Google Forms' }),
+        '.',
+      ]),
     );
+    els.summary.hidden = false;
+    els.summary.focus();
   } finally {
     setSending(false);
   }
@@ -488,9 +440,7 @@ els.form.addEventListener('submit', async (e) => {
    Thank-you screen + confetti
    ========================================================================== */
 function showSuccess() {
-  steps[current].classList.remove('is-active');
-  els.form.hidden = true;
-  els.stepper.hidden = true;
+  els.formView.hidden = true;
   els.progressFill.style.width = '100%';
 
   const r = CONFIG.reward;
@@ -504,8 +454,7 @@ function showSuccess() {
   }
 
   els.success.hidden = false;
-  els.success.classList.add('is-active');
-  window.scrollTo({ top: 0 });
+  window.scrollTo({ top: 0, behavior: 'auto' });
   els.successHeading.focus({ preventScroll: true });
   launchConfetti();
 }
@@ -560,16 +509,11 @@ function launchConfetti() {
 
 els.again.addEventListener('click', () => {
   els.form.reset();
-  steps.slice(1).forEach((fs) => { syncOther(fs); showError(fs, null); });
+  attemptedSubmit = false;
+  fieldsets.forEach((fs) => { syncOther(fs); showError(fs, null); refresh(fs); });
+  showSummary([]);
   els.success.hidden = true;
-  els.success.classList.remove('is-active');
-  els.form.hidden = false;
-  steps.forEach((s) => s.classList.remove('is-active', 'enter-forward', 'enter-back'));
-  steps[0].classList.add('is-active');
-  current = 0;
-  els.progress.hidden = true;
-  els.stepper.hidden = true;
-  updateProgress();
-  window.scrollTo({ top: 0 });
-  steps[0].querySelector('h1').focus({ preventScroll: true });
+  els.formView.hidden = false;
+  window.scrollTo({ top: 0, behavior: 'auto' });
+  els.start.focus({ preventScroll: true });
 });

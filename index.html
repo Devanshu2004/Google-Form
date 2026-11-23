@@ -12,6 +12,8 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <a class="skip-link" href="#q1">Skip to the questions</a>
+
   <div class="bg" aria-hidden="true">
     <span class="blob blob-1"></span>
     <span class="blob blob-2"></span>
@@ -19,7 +21,7 @@
     <span class="grid"></span>
   </div>
 
-  <div class="progress" id="progress" role="progressbar" aria-label="Survey progress" aria-valuemin="0" aria-valuemax="7" aria-valuenow="0" hidden>
+  <div class="progress" id="progress" role="progressbar" aria-label="Survey progress" aria-valuemin="0" aria-valuemax="7" aria-valuenow="0">
     <span class="progress-fill" id="progress-fill"></span>
   </div>
 
@@ -29,77 +31,81 @@
   </header>
 
   <main id="main">
-    <noscript>
-      <p class="noscript">
-        This survey needs JavaScript. You can
-        <a href="https://docs.google.com/forms/d/e/1FAIpQLSctEjG5cFtYR0NGwohlyUQcscaagunSVes6E_1ieL_YF19T3Q/viewform">fill it out on Google Forms</a>
-        instead.
-      </p>
-    </noscript>
-
-    <form id="dlp-form" novalidate>
-      <!-- Welcome screen -->
-      <section class="step step-welcome is-active" data-step="0" aria-labelledby="welcome-heading">
-        <div class="step-inner">
-          <p class="eyebrow"><span class="pulse" aria-hidden="true"></span> Community Survey</p>
-          <h1 id="welcome-heading" tabindex="-1">Let's Build the Future of DLP <span class="highlight">Together!</span></h1>
-          <p class="lead">DLP is all about its community, and we want <strong>YOU</strong> to be part of what comes next.</p>
-          <p class="lead">Share your feedback, ideas, and thoughts through our survey. Every response counts!</p>
-          <p class="gift-teaser">
-            <span class="gift-icon" aria-hidden="true">🎁</span>
-            <span>And yes... there's a little something for you at the end!</span>
-          </p>
-          <div class="actions">
-            <button type="button" class="btn btn-start" data-action="next">
-              Let's go
-              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6"/></svg>
-            </button>
-            <span class="enter-hint" aria-hidden="true">press <kbd>Enter ↵</kbd></span>
-          </div>
+    <div id="form-view">
+      <section class="hero" aria-labelledby="welcome-heading">
+        <p class="eyebrow"><span class="pulse" aria-hidden="true"></span> Community Survey</p>
+        <h1 id="welcome-heading">Let's Build the Future of DLP <span class="highlight">Together!</span></h1>
+        <p class="lead">DLP is all about its community, and we want <strong>YOU</strong> to be part of what comes next.</p>
+        <p class="lead">Share your feedback, ideas, and thoughts through our survey. Every response counts!</p>
+        <p class="gift-teaser">
+          <span class="gift-icon" aria-hidden="true">🎁</span>
+          <span>And yes... there's a little something for you at the end!</span>
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-white" href="#q1" id="start-btn">
+            Let's go
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M6 13l6 6 6-6"/></svg>
+          </a>
           <p class="time-note">
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-            Takes about 2 minutes · 7 questions
+            About 2 minutes · 7 questions
           </p>
         </div>
       </section>
 
-      <!-- Question screens are built from CONFIG in script.js -->
-      <div id="questions"></div>
-    </form>
+      <noscript>
+        <p class="noscript">
+          This survey needs JavaScript. You can
+          <a href="https://docs.google.com/forms/d/e/1FAIpQLSctEjG5cFtYR0NGwohlyUQcscaagunSVes6E_1ieL_YF19T3Q/viewform">fill it out on Google Forms</a>
+          instead.
+        </p>
+      </noscript>
+
+      <form id="dlp-form" class="survey" novalidate>
+        <p class="required-note"><span class="req" aria-hidden="true">*</span> All questions are required</p>
+
+        <!-- Questions are built from CONFIG in script.js -->
+        <div id="questions"></div>
+
+        <div id="error-summary" class="error-summary" role="alert" tabindex="-1" hidden></div>
+
+        <div class="submit-card">
+          <div>
+            <p class="submit-title">All done? 🙌</p>
+            <p class="submit-sub">Send your answers and see your surprise.</p>
+          </div>
+          <button type="submit" class="btn btn-white" id="submit-btn">
+            <span class="btn-label">Submit</span>
+            <svg class="btn-arrow" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+      </form>
+    </div>
 
     <!-- Thank-you screen -->
-    <section class="step step-success" id="success-view" aria-labelledby="success-heading" hidden>
-      <div class="step-inner">
-        <div class="gift-burst" aria-hidden="true">
-          <span class="ring ring-1"></span>
-          <span class="ring ring-2"></span>
-          <span class="gift-big">🎉</span>
-        </div>
-        <h2 id="success-heading" tabindex="-1">Thank you!</h2>
-        <p class="lead">Your response has been recorded. You're helping shape what DLP does next.</p>
-
-        <div class="reward-card" id="reward-card" hidden>
-          <p class="reward-label">Your little something 🎁</p>
-          <p class="reward-title" id="reward-title"></p>
-          <p class="reward-text" id="reward-text"></p>
-          <a class="btn btn-start" id="reward-link" target="_blank" rel="noopener" hidden></a>
-        </div>
-
-        <button type="button" class="btn btn-ghost" id="again-btn">Submit another response</button>
+    <section class="success" id="success-view" aria-labelledby="success-heading" hidden>
+      <div class="gift-burst" aria-hidden="true">
+        <span class="ring ring-1"></span>
+        <span class="ring ring-2"></span>
+        <span class="gift-big">🎉</span>
       </div>
+      <h2 id="success-heading" tabindex="-1">Thank you!</h2>
+      <p class="lead">Your response has been recorded. You're helping shape what DLP does next.</p>
+
+      <div class="reward-card" id="reward-card" hidden>
+        <p class="reward-label">Your little something 🎁</p>
+        <p class="reward-title" id="reward-title"></p>
+        <p class="reward-text" id="reward-text"></p>
+        <a class="btn btn-blue" id="reward-link" target="_blank" rel="noopener" hidden></a>
+      </div>
+
+      <button type="button" class="btn btn-ghost" id="again-btn">Submit another response</button>
     </section>
   </main>
 
-  <nav class="stepper" id="stepper" aria-label="Question navigation" hidden>
-    <button type="button" class="stepper-btn" id="prev-btn" aria-label="Previous question">
-      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M6 15l6-6 6 6"/></svg>
-    </button>
-    <button type="button" class="stepper-btn" id="next-btn" aria-label="Next question">
-      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>
-    </button>
-  </nav>
-
-  <div class="sr-only" id="announcer" aria-live="polite"></div>
+  <footer class="site-footer">
+    <p>© <span id="year"></span> Data Liberation Project · MuckRock Foundation</p>
+  </footer>
 
   <script src="script.js"></script>
 </body>
